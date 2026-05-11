@@ -5,7 +5,7 @@ import scikit-learn as sklearn
 from sklearn.linear_model import LinearRegression
 
 # Cấu hình trang
-st.set_page_config(page_title="AI Dự Đoán Giá Xe Máy", layout="wide")
+st.set_page_config(page_title="Dự Đoán Giá Xe Máy", layout="wide")
 
 # --- 1. HÀM TẢI VÀ XỬ LÝ DỮ LIỆU ---
 @st.cache_data
