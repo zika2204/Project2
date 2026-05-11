@@ -11,7 +11,7 @@ st.set_page_config(page_title="AI Định Giá Xe Máy", layout="centered")
 def load_data():
     try:
         # Đọc file CSV (đảm bảo tên file này đúng với file trên GitHub của bạn)
-        path = "datasheet AI's project - Trang tính1.csv"
+        path = "xecu.csv"
         df = pd.read_csv(path)
         
         # Xử lý tên cột bị thừa khoảng trắng
