@@ -2,18 +2,18 @@ import streamlit as st
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
-# =====================================
-# CẤU HÌNH TRANG
-# =====================================
+# =========================================
+# CẤU HÌNH APP
+# =========================================
 st.set_page_config(
     page_title="MOTO CŨ VN",
     page_icon="🏍️",
     layout="centered"
 )
 
-# =====================================
+# =========================================
 # CSS GIAO DIỆN
-# =====================================
+# =========================================
 st.markdown("""
 <style>
 
@@ -23,22 +23,22 @@ st.markdown("""
 
 .title {
     text-align: center;
-    font-size: 50px;
+    font-size: 52px;
     font-weight: bold;
     color: #E53935;
 }
 
 .subtitle {
     text-align: center;
-    font-size: 18px;
     color: gray;
+    font-size: 18px;
     margin-bottom: 35px;
 }
 
 .result-box {
     background-color: #f5f5f5;
-    padding: 25px;
-    border-radius: 15px;
+    padding: 30px;
+    border-radius: 18px;
     margin-top: 25px;
     text-align: center;
 }
@@ -46,9 +46,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# =====================================
+# =========================================
 # LOAD DATA
-# =====================================
+# =========================================
 @st.cache_data
 def load_data():
 
@@ -60,9 +60,9 @@ def load_data():
         # Chuẩn hóa tên cột
         df.columns = df.columns.str.strip().str.lower()
 
-        # =====================================
-        # XỬ LÝ GIÁ
-        # =====================================
+        # =========================================
+        # XỬ LÝ PRICE
+        # =========================================
         df["price_numeric"] = (
             df["price"]
             .astype(str)
@@ -71,9 +71,9 @@ def load_data():
             .astype(float)
         )
 
-        # =====================================
+        # =========================================
         # XỬ LÝ ODO
-        # =====================================
+        # =========================================
         df["odo_numeric"] = (
             df["odo"]
             .astype(str)
@@ -82,24 +82,70 @@ def load_data():
             .astype(float)
         )
 
+        # =========================================
+        # XỬ LÝ CONDITION
+        # =========================================
+        df["condition"] = (
+            pd.to_numeric(
+                df["condition"],
+                errors="coerce"
+            )
+        )
+
+        # =========================================
+        # XỬ LÝ REPAIRED PART
+        # =========================================
+        df["repaired_part"] = (
+            df["repaired_part"]
+            .astype(str)
+            .str.lower()
+        )
+
+        # Đổi Yes/No thành 1/0
+        df["repaired_part"] = (
+            df["repaired_part"]
+            .map({
+                "yes": 1,
+                "no": 0,
+                "có": 1,
+                "không": 0
+            })
+        )
+
+        # =========================================
+        # XỬ LÝ LOCATION
+        # =========================================
+        df["location"] = (
+            df["location"]
+            .astype(str)
+        )
+
+        # One-hot encoding location
+        df = pd.get_dummies(
+            df,
+            columns=["location"]
+        )
+
         # Xóa dữ liệu lỗi
         df = df.dropna()
 
         return df
 
     except Exception as e:
+
         st.error(f"Lỗi tải dữ liệu: {e}")
+
         return None
 
 
-# =====================================
+# =========================================
 # LOAD DATA
-# =====================================
+# =========================================
 df = load_data()
 
-# =====================================
+# =========================================
 # HEADER
-# =====================================
+# =========================================
 st.markdown(
     '<p class="title">🏍️ MOTO CŨ VN</p>',
     unsafe_allow_html=True
@@ -110,28 +156,40 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# =====================================
+# =========================================
 # MAIN APP
-# =====================================
+# =========================================
 if df is not None:
 
     st.subheader("📌 Nhập thông tin xe")
 
-    # =====================================
-    # CHỌN HÃNG XE
-    # =====================================
-    all_brands = sorted(df["brand"].unique())
+    # =========================================
+    # LẤY LẠI LOCATION GỐC
+    # =========================================
+    location_columns = [
+        col for col in df.columns
+        if col.startswith("location_")
+    ]
+
+    # =========================================
+    # BRAND
+    # =========================================
+    all_brands = sorted(
+        df["brand"].unique()
+    )
 
     selected_brand = st.selectbox(
         "Hãng xe",
         all_brands
     )
 
-    # =====================================
-    # CHỌN DÒNG XE
-    # =====================================
+    # =========================================
+    # MODEL
+    # =========================================
     all_models = sorted(
-        df[df["brand"] == selected_brand]["model"].unique()
+        df[
+            df["brand"] == selected_brand
+        ]["model"].unique()
     )
 
     selected_model = st.selectbox(
@@ -139,12 +197,13 @@ if df is not None:
         all_models
     )
 
-    # =====================================
-    # NHẬP NĂM & ODO
-    # =====================================
+    # =========================================
+    # YEAR & ODO
+    # =========================================
     col1, col2 = st.columns(2)
 
     with col1:
+
         input_year = st.number_input(
             "Năm sản xuất",
             min_value=2010,
@@ -153,6 +212,7 @@ if df is not None:
         )
 
     with col2:
+
         input_odo = st.number_input(
             "Số KM đã chạy",
             min_value=0,
@@ -160,9 +220,45 @@ if df is not None:
             step=500
         )
 
-    # =====================================
+    # =========================================
+    # CONDITION
+    # =========================================
+    input_condition = st.slider(
+        "Tình trạng xe (0 - 10)",
+        min_value=0,
+        max_value=10,
+        value=8
+    )
+
+    # =========================================
+    # REPAIRED PART
+    # =========================================
+    repaired_input = st.radio(
+        "Xe đã thay phụ tùng?",
+        ["Không", "Có"]
+    )
+
+    repaired_value = (
+        1 if repaired_input == "Có"
+        else 0
+    )
+
+    # =========================================
+    # LOCATION
+    # =========================================
+    all_locations = [
+        col.replace("location_", "")
+        for col in location_columns
+    ]
+
+    selected_location = st.selectbox(
+        "Khu vực",
+        all_locations
+    )
+
+    # =========================================
     # DATA TRAIN
-    # =====================================
+    # =========================================
     data_same_model = df[
         df["model"] == selected_model
     ]
@@ -178,56 +274,83 @@ if df is not None:
 
     data_train = data_train.drop_duplicates()
 
-    # =====================================
+    # =========================================
     # TRAIN MODEL
-    # =====================================
+    # =========================================
     if len(data_train) >= 5:
 
-        # Feature
+        # Feature columns
+        feature_columns = [
+            "year",
+            "odo_numeric",
+            "condition",
+            "repaired_part"
+        ] + location_columns
+
+        # X train
         X_train = data_train[
-            [
-                "year",
-                "odo_numeric"
-            ]
+            feature_columns
         ]
 
-        # Target
+        # y train
         y_train = data_train[
             "price_numeric"
         ]
 
-        # Model AI
+        # Model
         model_ai = LinearRegression()
 
-        # Huấn luyện
-        model_ai.fit(X_train, y_train)
+        # Train
+        model_ai.fit(
+            X_train,
+            y_train
+        )
 
-        # =====================================
-        # BUTTON DỰ ĐOÁN
-        # =====================================
+        # =========================================
+        # BUTTON
+        # =========================================
         if st.button("💰 Dự đoán giá"):
 
-            # Input mới
+            # Tạo dictionary input
+            input_data = {
+                "year": input_year,
+                "odo_numeric": input_odo,
+                "condition": input_condition,
+                "repaired_part": repaired_value
+            }
+
+            # Fill location columns
+            for col in location_columns:
+
+                input_data[col] = 0
+
+            selected_col = (
+                f"location_{selected_location}"
+            )
+
+            if selected_col in input_data:
+
+                input_data[selected_col] = 1
+
+            # DataFrame predict
             X_new = pd.DataFrame(
-                [[
-                    input_year,
-                    input_odo
-                ]],
-                columns=[
-                    "year",
-                    "odo_numeric"
-                ]
+                [input_data]
             )
 
             # Predict
-            prediction = model_ai.predict(X_new)[0]
+            prediction = (
+                model_ai.predict(X_new)[0]
+            )
 
-            # Không cho giá âm
-            final_price = max(prediction, 0)
+            # Không cho âm
+            final_price = max(
+                prediction,
+                0
+            )
 
-            # =====================================
-            # HIỂN THỊ KẾT QUẢ
-            # =====================================
+            # =========================================
+            # HIỂN THỊ
+            # =========================================
             st.markdown(
                 f"""
                 <div class="result-box">
@@ -239,8 +362,9 @@ if df is not None:
                 </h1>
 
                 <p style="color:gray;">
-                Giá được AI dự đoán dựa trên
-                năm sản xuất và số KM đã chạy.
+                Giá được AI dự đoán dựa trên:
+                năm sản xuất, số KM đã chạy,
+                tình trạng xe, phụ tùng và khu vực.
                 </p>
 
                 </div>
@@ -249,28 +373,24 @@ if df is not None:
             )
 
     else:
+
         st.warning(
             "❌ Không đủ dữ liệu để AI học."
         )
 
-    # =====================================
-    # XEM DỮ LIỆU
-    # =====================================
-    with st.expander("📋 Xem dữ liệu tham khảo"):
+    # =========================================
+    # DATAFRAME
+    # =========================================
+    with st.expander(
+        "📋 Xem dữ liệu tham khảo"
+    ):
 
         st.dataframe(
-            df[
-                [
-                    "brand",
-                    "model",
-                    "year",
-                    "odo",
-                    "price"
-                ]
-            ]
+            df.head(20)
         )
 
 else:
+
     st.info(
         "Hãy kiểm tra file xecu.csv."
     )
