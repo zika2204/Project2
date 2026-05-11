@@ -54,7 +54,7 @@ def load_data():
 
     try:
 
-        # Đọc file CSV
+        # Đọc CSV
         df = pd.read_csv("xecu.csv")
 
         # Chuẩn hóa tên cột
@@ -85,25 +85,22 @@ def load_data():
         # =========================================
         # XỬ LÝ CONDITION
         # =========================================
-        df["condition"] = (
-            pd.to_numeric(
-                df["condition"],
-                errors="coerce"
-            )
+        df["condition"] = pd.to_numeric(
+            df["condition"],
+            errors="coerce"
         )
 
         # =========================================
         # XỬ LÝ REPAIRED PART
         # =========================================
-        df["repaired_parts"] = (
-            df["repaired_parts"]
+        df["repaired_part"] = (
+            df["repaired_part"]
             .astype(str)
             .str.lower()
         )
 
-        # Đổi Yes/No thành 1/0
-        df["repaired_parts"] = (
-            df["repaired_parts"]
+        df["repaired_part"] = (
+            df["repaired_part"]
             .map({
                 "yes": 1,
                 "no": 0,
@@ -120,13 +117,13 @@ def load_data():
             .astype(str)
         )
 
-        # One-hot encoding location
+        # One Hot Encoding
         df = pd.get_dummies(
             df,
             columns=["location"]
         )
 
-        # Xóa dữ liệu lỗi
+        # Xóa dòng lỗi
         df = df.dropna()
 
         return df
@@ -164,7 +161,7 @@ if df is not None:
     st.subheader("📌 Nhập thông tin xe")
 
     # =========================================
-    # LẤY LẠI LOCATION GỐC
+    # LOCATION COLUMNS
     # =========================================
     location_columns = [
         col for col in df.columns
@@ -307,16 +304,16 @@ if df is not None:
         )
 
         # =========================================
-        # BUTTON
+        # BUTTON DỰ ĐOÁN
         # =========================================
         if st.button("💰 Dự đoán giá"):
 
-            # Tạo dictionary input
+            # Dictionary input
             input_data = {
                 "year": input_year,
                 "odo_numeric": input_odo,
                 "condition": input_condition,
-                "repaired_parts": repaired_value
+                "repaired_part": repaired_value
             }
 
             # Fill location columns
@@ -324,6 +321,7 @@ if df is not None:
 
                 input_data[col] = 0
 
+            # Chọn location
             selected_col = (
                 f"location_{selected_location}"
             )
@@ -342,14 +340,14 @@ if df is not None:
                 model_ai.predict(X_new)[0]
             )
 
-            # Không cho âm
+            # Không cho giá âm
             final_price = max(
                 prediction,
                 0
             )
 
             # =========================================
-            # HIỂN THỊ
+            # HIỂN THỊ KẾT QUẢ
             # =========================================
             st.markdown(
                 f"""
