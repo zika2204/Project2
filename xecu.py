@@ -11,7 +11,7 @@ st.set_page_config(page_title="MOTO CŨ VN", page_icon="🏍️", layout="center
 
 st.markdown("""
 <style>
-    .title { text-align: center; font-size: 75px; font-weight: 900; color: #E53935; margin-bottom: 0px; }
+    .title { text-align: center; font-size: 150px; font-weight: 900; color: #E53935; margin-bottom: 0px; }
     .subtitle { text-align: center; color: #555; font-size: 20px; margin-bottom: 40px; }
     .result-box { background-color: #ffffff; padding: 30px; border-radius: 20px; border: 3px solid #E53935; text-align: center; }
     .price-text { color: #E53935; font-size: 45px; font-weight: bold; }
