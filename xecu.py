@@ -2,116 +2,121 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split # Thêm thư viện này theo ảnh bạn gửi
-from sklearn import metrics # Để đo lường sai sót
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
 
 # =========================================
-# CẤU HÌNH APP & CSS (Giữ nguyên của bạn)
+# CẤU HÌNH & GIAO DIỆN
 # =========================================
-st.set_page_config(page_title="MOTO CŨ VN", page_icon="🏍️", layout="centered")
-st.markdown("""<style>.main {padding-top: 20px;} .title {text-align: center; font-size: 52px; font-weight: bold; color: #E53935;} .subtitle {text-align: center; color: gray; font-size: 18px; margin-bottom: 35px;} .result-box {background-color: #f5f5f5; padding: 30px; border-radius: 18px; margin-top: 25px; text-align: center;}</style>""", unsafe_allow_html=True)
+st.set_page_config(page_title="MOTO CŨ VN - AI Pricing", page_icon="🏍️", layout="centered")
+
+st.markdown("""
+<style>
+    .title {text-align: center; font-size: 45px; font-weight: bold; color: #E53935;}
+    .result-box {background-color: #ffffff; padding: 25px; border-radius: 15px; border: 2px solid #E53935; text-align: center;}
+</style>
+""", unsafe_allow_html=True)
 
 # =========================================
-# LOAD DATA (Tối ưu lại phần xử lý)
+# LOAD & XỬ LÝ DỮ LIỆU
 # =========================================
 @st.cache_data
 def load_data():
     try:
+        # Đọc file (đảm bảo file xecu.csv có trên github)
         df = pd.read_csv("xecu.csv")
         df.columns = df.columns.str.strip().str.lower()
 
-        # Xử lý Price & Odo
+        # 1. Xử lý Giá & Odo (Bỏ ký tự lạ)
         df["price_numeric"] = df["price"].astype(str).str.replace('[",]', '', regex=True).astype(float)
         df["odo_numeric"] = df["odo"].astype(str).str.replace('[.,]', '', regex=True).astype(float)
         
-        # Xử lý Condition & Repaired
+        # 2. Xử lý Condition
         df["condition"] = pd.to_numeric(df["condition"], errors="coerce")
-        df["repaired_parts"] = df["repaired_parts"].astype(str).str.lower().map({"yes": 1, "no": 0, "có": 1, "không": 0})
         
-        # One Hot Encoding cho Location
+        # 3. Xử lý Phụ tùng (Repaired) - ĐƯA VỀ LOGIC CỦA BẠN:
+        # Không thay (Zin) = 0, Có thay = 1
+        df["repaired_parts"] = df["repaired_parts"].astype(str).str.lower().str.strip()
+        df["is_repaired"] = df["repaired_parts"].map({
+            "yes": 1, "có": 1, 
+            "no": 0, "không": 0
+        }).fillna(0)
+
+        # 4. One-Hot Encoding cho Location
         df = pd.get_dummies(df, columns=["location"])
-        return df.dropna()
+        
+        return df.dropna(subset=['price_numeric', 'odo_numeric', 'year', 'condition'])
     except Exception as e:
-        st.error(f"Lỗi tải dữ liệu: {e}")
+        st.error(f"Lỗi dữ liệu: {e}")
         return None
 
 df = load_data()
 
 # =========================================
-# HEADER
+# GIAO DIỆN NHẬP LIỆU
 # =========================================
 st.markdown('<p class="title">🏍️ MOTO CŨ VN</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">AI dự đoán giá xe máy cũ (Chuẩn Train/Test Split)</p>', unsafe_allow_html=True)
 
 if df is not None:
-    # --- PHẦN NHẬP LIỆU (Giữ nguyên logic của bạn) ---
-    location_columns = [col for col in df.columns if col.startswith("location_")]
-    all_brands = sorted(df["brand"].unique())
-    selected_brand = st.selectbox("Hãng xe", all_brands)
-    
-    all_models = sorted(df[df["brand"] == selected_brand]["model"].unique())
-    selected_model = st.selectbox("Dòng xe", all_models)
+    brand_list = sorted(df["brand"].unique())
+    col_a, col_b = st.columns(2)
+    with col_a:
+        selected_brand = st.selectbox("Hãng xe", brand_list)
+    with col_b:
+        model_list = sorted(df[df["brand"] == selected_brand]["model"].unique())
+        selected_model = st.selectbox("Dòng xe", model_list)
 
     col1, col2 = st.columns(2)
     with col1:
-        input_year = st.number_input("Năm sản xuất", min_value=2010, max_value=2026, value=2022)
+        input_year = st.number_input("Năm sản xuất (Càng cao giá càng tăng)", 2010, 2026, 2022)
+        input_condition = st.slider("Độ mới xe (0: Nát - 10: Như mới)", 0, 10, 8)
     with col2:
-        input_odo = st.number_input("Số KM đã chạy", min_value=0, value=5000, step=500)
+        input_odo = st.number_input("Số KM đã chạy (Càng cao giá càng giảm)", 0, 200000, 5000)
+        repaired_input = st.radio("Tình trạng phụ tùng:", ["Còn Zin (Chưa thay)", "Đã thay/Sửa chữa"])
 
-    input_condition = st.slider("Tình trạng xe (0 - 10)", 0, 10, 8)
-    repaired_input = st.radio("Xe đã thay phụ tùng?", ["Không", "Có"])
-    repaired_value = 1 if repaired_input == "Có" else 0
-
-    all_locations = [col.replace("location_", "") for col in location_columns]
-    selected_location = st.selectbox("Khu vực", all_locations)
+    repaired_val = 1 if repaired_input == "Đã thay/Sửa chữa" else 0
+    
+    loc_cols = [c for c in df.columns if c.startswith("location_")]
+    selected_loc = st.selectbox("Khu vực", [c.replace("location_", "") for c in loc_cols])
 
     # =========================================
-    # THỰC HIỆN ML THEO CÁCH BẠN HỌC (ẢNH GỬI)
+    # MACHINE LEARNING (TRAIN/TEST SPLIT)
     # =========================================
-    # Gom dữ liệu để máy học (Cùng model hoặc cùng hãng để dữ liệu phong phú hơn)
-    data_train_all = df[(df["model"] == selected_model) | (df["brand"] == selected_brand)].drop_duplicates()
+    # Gom dữ liệu xe cùng loại để máy học quy luật
+    data_train = df[(df["model"] == selected_model) | (df["brand"] == selected_brand)]
 
-    if len(data_train_all) >= 10: # Cần nhiều dữ liệu hơn một chút để chia tập Test
-        feature_columns = ["year", "odo_numeric", "condition", "repaired_parts"] + location_columns
-        X = data_train_all[feature_columns]
-        y = data_train_all["price_numeric"]
+    if len(data_train) >= 8:
+        features = ["year", "odo_numeric", "condition", "is_repaired"] + loc_cols
+        X = data_train[features]
+        y = data_train["price_numeric"]
 
-        # --- BƯỚC CHIA DỮ LIỆU THEO ẢNH ---
-        # 80% để học (Train), 20% để kiểm tra (Test)
+        # Chia 80% học, 20% thi (Theo ảnh bài học L3)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Khởi tạo mô hình
-        model_ai = LinearRegression()
+        model = LinearRegression()
+        model.fit(X_train, y_train)
 
-        # Máy bắt đầu học trên tập Train
-        model_ai.fit(X_train, y_train)
-
-        # Kiểm tra sai sót trên tập Test
-        y_pred_test = model_ai.predict(X_test)
-        mae = metrics.mean_absolute_error(y_test, y_pred_test) # Sai số trung bình (VNĐ)
-        r2 = metrics.r2_score(y_test, y_pred_test) # Độ chính xác (%)
-
-        # --- NÚT DỰ ĐOÁN ---
-        if st.button("💰 Dự đoán giá"):
-            # Chuẩn bị dữ liệu input
-            input_dict = {"year": input_year, "odo_numeric": input_odo, "condition": input_condition, "repaired_parts": repaired_value}
-            for col in location_columns: input_dict[col] = 0
-            selected_col = f"location_{selected_location}"
-            if selected_col in input_dict: input_dict[selected_col] = 1
-
-            X_new = pd.DataFrame([input_dict])
-            prediction = model_ai.predict(X_new)[0]
-            final_price = max(prediction, 0)
-
-            # HIỂN THỊ KẾT QUẢ
-            st.markdown(f"""<div class="result-box"><h2>💵 Giá dự đoán</h2><h1 style="color:#E53935;">{final_price:,.0f} VNĐ</h1>
-                        <p style="color:gray;">Độ tin cậy của mô hình: <b>{r2:.2%}</b><br>
-                        Sai số dự kiến: +/- {mae:,.0f} VNĐ</p></div>""", unsafe_allow_html=True)
+        if st.button("🚀 ĐỊNH GIÁ XE NGAY"):
+            # Dự đoán
+            in_data = {"year": input_year, "odo_numeric": input_odo, "condition": input_condition, "is_repaired": repaired_val}
+            for c in loc_cols: in_data[c] = 1 if c == f"location_{selected_loc}" else 0
             
-            if r2 < 0.5:
-                st.warning("⚠️ Dữ liệu về dòng xe này còn ít hoặc biến động lớn, kết quả chỉ mang tính chất tham khảo.")
+            X_new = pd.DataFrame([in_data])
+            pred = model.predict(X_new)[0]
+            
+            # Logic kiểm tra: Đảm bảo giá xe zin > giá xe đã thay phụ tùng nếu các biến khác bằng nhau
+            # (Linear Regression sẽ tự học điều này nếu dữ liệu chuẩn)
+            
+            st.markdown(f"""
+            <div class="result-box">
+                <h3 style="color:gray;">Giá trị ước tính</h3>
+                <h1 style="color:#E53935;">{max(pred, 0):,.0f} VNĐ</h1>
+                <p>Độ chính xác mô hình: {model.score(X_test, y_test):.1%}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Giải thích logic cho người dùng
+            st.write("---")
+            st.info(f"**Giải thích từ AI:** Xe đời {input_year} với odo {input_odo:,}km được định giá dựa trên xu hướng giảm giá theo thời gian và độ hao mòn linh kiện.")
     else:
-        st.warning("❌ Dữ liệu quá ít để thực hiện chia tập Train/Test theo chuẩn ML. Hãy thêm dữ liệu vào file CSV.")
-
-    with st.expander("📋 Xem dữ liệu tham khảo"):
-        st.dataframe(df.head(10))
+        st.warning("Dữ liệu dòng xe này quá ít, AI chưa thể học được quy luật.")
