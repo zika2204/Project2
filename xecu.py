@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 # =====================================
-# CẤU HÌNH GIAO DIỆN
+# CẤU HÌNH TRANG
 # =====================================
 st.set_page_config(
     page_title="MOTO CŨ VN",
@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # =====================================
-# CSS
+# CSS GIAO DIỆN
 # =====================================
 st.markdown("""
 <style>
@@ -23,23 +23,24 @@ st.markdown("""
 
 .title {
     text-align: center;
-    font-size: 48px;
+    font-size: 50px;
     font-weight: bold;
     color: #E53935;
 }
 
 .subtitle {
     text-align: center;
-    color: gray;
-    margin-bottom: 30px;
     font-size: 18px;
+    color: gray;
+    margin-bottom: 35px;
 }
 
 .result-box {
     background-color: #f5f5f5;
     padding: 25px;
     border-radius: 15px;
-    margin-top: 20px;
+    margin-top: 25px;
+    text-align: center;
 }
 
 </style>
@@ -53,6 +54,7 @@ def load_data():
 
     try:
 
+        # Đọc file CSV
         df = pd.read_csv("xecu.csv")
 
         # Chuẩn hóa tên cột
@@ -81,25 +83,30 @@ def load_data():
         )
 
         # =====================================
-        # THÊM CỘT CONDITION
+        # THÊM CONDITION
         # =====================================
-        # Nếu file CSV chưa có condition
         if "condition" not in df.columns:
             df["condition"] = 8
 
         # =====================================
-        # THÊM CỘT PARTS_CHANGED
+        # THÊM PARTS_CHANGED
         # =====================================
         if "parts_changed" not in df.columns:
             df["parts_changed"] = 0
 
-        return df.dropna()
+        # Xóa dữ liệu lỗi
+        df = df.dropna()
+
+        return df
 
     except Exception as e:
         st.error(f"Lỗi tải dữ liệu: {e}")
         return None
 
 
+# =====================================
+# LOAD DATA
+# =====================================
 df = load_data()
 
 # =====================================
@@ -123,7 +130,7 @@ if df is not None:
     st.subheader("📌 Nhập thông tin xe")
 
     # =====================================
-    # BRAND
+    # CHỌN HÃNG XE
     # =====================================
     all_brands = sorted(df["brand"].unique())
 
@@ -133,7 +140,7 @@ if df is not None:
     )
 
     # =====================================
-    # MODEL
+    # CHỌN DÒNG XE
     # =====================================
     all_models = sorted(
         df[df["brand"] == selected_brand]["model"].unique()
@@ -145,7 +152,7 @@ if df is not None:
     )
 
     # =====================================
-    # YEAR & ODO
+    # INPUT NĂM & ODO
     # =====================================
     col1, col2 = st.columns(2)
 
@@ -166,7 +173,7 @@ if df is not None:
         )
 
     # =====================================
-    # CONDITION
+    # TÌNH TRẠNG XE
     # =====================================
     input_condition = st.slider(
         "Tình trạng xe (0 - 10)",
@@ -176,14 +183,14 @@ if df is not None:
     )
 
     # =====================================
-    # PARTS CHANGED
+    # THAY PHỤ TÙNG
     # =====================================
     parts_changed = st.radio(
         "Xe đã thay phụ tùng chưa?",
         ["Chưa", "Đã thay"]
     )
 
-    # Chuyển thành số
+    # Đổi thành số
     parts_value = 1 if parts_changed == "Đã thay" else 0
 
     # =====================================
@@ -209,7 +216,7 @@ if df is not None:
     # =====================================
     if len(data_train) >= 5:
 
-        # Features
+        # Feature
         X_train = data_train[
             [
                 "year",
@@ -224,13 +231,14 @@ if df is not None:
             "price_numeric"
         ]
 
-        # Model
+        # Model AI
         model_ai = LinearRegression()
 
+        # Huấn luyện
         model_ai.fit(X_train, y_train)
 
         # =====================================
-        # BUTTON
+        # BUTTON DỰ ĐOÁN
         # =====================================
         if st.button("💰 Dự đoán giá"):
 
@@ -253,78 +261,40 @@ if df is not None:
             # Predict
             prediction = model_ai.predict(X_new)[0]
 
+            # Không cho giá âm
             final_price = max(prediction, 0)
-
-            # =====================================
-            # KHẤU HAO
-            # =====================================
-            newest_year = data_train["year"].max()
-
-            years_used = newest_year - input_year
-
-            depreciation_year = (
-                years_used * 0.05 * final_price
-            )
-
-            depreciation_odo = (
-                input_odo / 1000
-            ) * 120000
-
-            # Condition ảnh hưởng giá
-            condition_loss = (
-                (10 - input_condition)
-                * 0.03
-                * final_price
-            )
-
-            # Parts changed ảnh hưởng giá
-            parts_loss = (
-                0.05 * final_price
-                if parts_value == 1
-                else 0
-            )
-
-            total_depreciation = (
-                depreciation_year
-                + depreciation_odo
-                + condition_loss
-                + parts_loss
-            )
 
             # =====================================
             # HIỂN THỊ KẾT QUẢ
             # =====================================
-            # =====================================
-# HIỂN THỊ KẾT QUẢ
-# =====================================
-st.markdown(
-    f"""
-    <div class="result-box">
+            st.markdown(
+                f"""
+                <div class="result-box">
 
-    <h2>💵 Giá dự đoán</h2>
+                <h2>💵 Giá dự đoán</h2>
 
-    <h1 style="color:#E53935;">
-    {final_price:,.0f} VNĐ
-    </h1>
+                <h1 style="color:#E53935;">
+                {final_price:,.0f} VNĐ
+                </h1>
 
-    <p style="color:gray;">
-    Giá được AI dự đoán dựa trên:
-    năm sản xuất, số KM đã chạy,
-    tình trạng xe và phụ tùng.
-    </p>
+                <p style="color:gray;">
+                Giá được AI dự đoán dựa trên:
+                năm sản xuất, số KM đã chạy,
+                tình trạng xe và phụ tùng.
+                </p>
 
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
     else:
         st.warning(
-            "Không đủ dữ liệu để AI học."
+            "❌ Không đủ dữ liệu để AI học."
         )
 
     # =====================================
-    # DATAFRAME
+    # XEM DỮ LIỆU GỐC
     # =====================================
     with st.expander("📋 Xem dữ liệu tham khảo"):
 
