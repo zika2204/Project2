@@ -93,14 +93,14 @@ def load_data():
         # =========================================
         # XỬ LÝ REPAIRED PART
         # =========================================
-        df["repaired_part"] = (
-            df["repaired_part"]
+        df["repaired_parts"] = (
+            df["repaired_parts"]
             .astype(str)
             .str.lower()
         )
 
-        df["repaired_part"] = (
-            df["repaired_part"]
+        df["repaired_parts"] = (
+            df["repaired_parts"]
             .map({
                 "yes": 1,
                 "no": 0,
@@ -281,7 +281,7 @@ if df is not None:
             "year",
             "odo_numeric",
             "condition",
-            "repaired_part"
+            "repaired_parts"
         ] + location_columns
 
         # X train
@@ -313,7 +313,7 @@ if df is not None:
                 "year": input_year,
                 "odo_numeric": input_odo,
                 "condition": input_condition,
-                "repaired_part": repaired_value
+                "repaired_parts": repaired_value
             }
 
             # Fill location columns
