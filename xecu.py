@@ -2,69 +2,85 @@ import streamlit as st
 import pandas as pd
 
 # Cấu hình trang
-st.set_page_config(page_title="Tra cứu giá xe máy", layout="centered")
+st.set_page_config(page_title="Hệ thống tra cứu giá xe máy", layout="centered")
 
-# --- DANH SÁCH DỮ LIỆU ---
-hang_xe_list = [
-    "Honda", "VinFast", "Yamaha", "Piaggio", "SYM", "Suzuki", "Yadea", "Pega", 
-    "Dibao", "Selex", "Anbico", "Voge", "BMW", "Kawasaki", "Harley-Davidson", 
-    "KTM", "Triumph", "Ducati", "Royal Enfield", "Benelli", "CFMOTO", "Lifan", "Zontes"
-]
+# --- HÀM TẢI DỮ LIỆU ---
+@st.cache_data
+def load_data():
+    try:
+        # Thay đổi tên file này cho đúng với file của bạn trên GitHub
+        file_path = "datasheet AI's project - Trang tính1.csv"
+        df = pd.read_csv(file_path)
+        
+        # Làm sạch tên cột (xóa khoảng trắng thừa)
+        df.columns = df.columns.str.strip()
+        
+        # Chuyển đổi năm về kiểu số nguyên
+        df['year'] = df['year'].astype(int)
+        
+        # Chuyển đổi odo về kiểu chuỗi để hiển thị đẹp hơn
+        df['odo'] = df['odo'].astype(str)
+        
+        return df
+    except Exception as e:
+        st.error(f"Không tìm thấy hoặc không thể đọc file dữ liệu: {e}")
+        return None
 
-model_xe_list = [
-    "Winner X Đặc biệt", "Winner X Tiêu chuẩn", "Winner V2", "SH 125i", "SH 150i", "SH 300i", 
-    "SH Mode", "Air Blade", "Lead Đèn Led", "Lead", "Vision", "Vario 125", "Vario 150", 
-    "Vario 160", "PCX 125", "PCX 150", "PCX 160", "Future 125 FI", "Future 125", 
-    "Wave Alpha", "Wave RSX", "Super Cub C125", "Monkey", "Zoomer X", "Dylan", "Beat", 
-    "Sonic 150", "CBR 150R", "Rebel 500", "CB300R", "CB500X", "ADV 150", "ADV 160", 
-    "Exciter 150", "Exciter 155 VVA", "Grand Filano", "NVX 155", "Janus", "Sirius", 
-    "Jupiter RC", "Jupiter Finn", "R15 v3", "YZF-R15", "YZF-R7", "YZF-R6", "MT-15", 
-    "MT-07", "MT-09", "FZ150i", "PG-1", "XS 125", "XMAX 250", "XMAX 300", "Lexi 125", 
-    "FreeGo S", "Acruzo", "Mio 125", "Tracer 9 GT", "Vespa Primavera 125", "Vespa Primavera 150", 
-    "Vespa Sprint 125", "Vespa Sprint S 150", "Vespa LX 125", "Vespa GTS 300", 
-    "Vespa GTS 300 Super", "Vespa 946", "Liberty 125", "Medley 150", "Zip 50", "Fly 125", 
-    "Beverly 300", "Raider 150", "Satria F150", "Viva 115", "Address 125", "Hayate 125", 
-    "Impulse", "Skydrive", "Burgman 200", "GSX-S150", "GSX-R150", "V-Strom 250", 
-    "V-Strom 650", "Attila V", "Shark 50", "Elite 50", "Elite 150", "Galaxy 125", 
-    "Angel 125", "Elegant 50", "VF 185", "Happy", "Simply 125", "MaxSym 400", 
-    "JET 14 150", "JET X 150", "ADX 125", "TL 500", "Klara S (2022)", "Klara S", 
-    "Vento S", "Theon S", "Feliz S", "Feliz Neo", "Evo 200", "Impes", "Tempest", 
-    "E3 Lite", "G5", "Xmen", "XMEN", "Buya", "Buya E", "A10", "Lado", "L1", "S1", 
-    "C2", "Kiki", "Pega Camel 1", "Ninja 400", "Z900", "Versys 650", "KLX 230", 
-    "G 310 R", "G 310 GS", "F 750 GS", "Iron 883", "Forty Eight", "Street Bob", 
-    "Street Twin", "Trident 660", "Scrambler Icon", "Monster 821", "Classic 350", 
-    "Meteor 350", "TNT 150i", "Leoncino 250", "Benelli", "300AC", "300SR", "650MT", 
-    "KP150", "ZT 155"
-]
+# Load dữ liệu
+df = load_data()
 
-years = list(range(2014, 2025))
-
-# --- GIAO DIỆN ---
+# --- GIAO DIỆN APP ---
 st.title("🏍️ Hệ thống tra cứu giá xe")
-st.write("Vui lòng chọn thông tin xe để xem giá dự kiến.")
+st.write("Dữ liệu được cập nhật tự động từ file datasheet.")
 
-# Sử dụng cột để giao diện đẹp hơn
-col1, col2 = st.columns(2)
+if df is not None:
+    # --- PHẦN CHỌN DỮ LIỆU ---
+    # 1. Chọn Hãng (Lấy từ cột 'brand')
+    list_hang = sorted(df['brand'].unique())
+    hang_chon = st.selectbox("Chọn hãng xe:", list_hang)
 
-with col1:
-    hang_chon = st.selectbox("Chọn hãng xe:", hang_xe_list)
-    nam_chon = st.selectbox("Chọn năm sản xuất:", years)
+    # 2. Chọn Model (Chỉ hiện các model thuộc hãng đã chọn)
+    df_filtered_by_brand = df[df['brand'] == hang_chon]
+    list_model = sorted(df_filtered_by_brand['model'].unique())
+    model_chon = st.selectbox("Chọn model xe:", list_model)
 
-with col2:
-    model_chon = st.selectbox("Chọn Model xe:", model_xe_list)
+    # 3. Chọn Năm (Chỉ hiện các năm có sẵn của model đó)
+    df_filtered_by_model = df_filtered_by_brand[df_filtered_by_brand['model'] == model_chon]
+    list_year = sorted(df_filtered_by_model['year'].unique(), reverse=True)
+    nam_chon = st.selectbox("Chọn năm sản xuất:", list_year)
 
-# Nút bấm tính toán
-if st.button("Xem giá xe", use_container_width=True):
-    # Logic hiển thị giá (Sau này bạn sẽ thay bằng việc đọc file CSV/Excel)
-    st.divider()
-    st.subheader(f"Kết quả cho: {hang_chon} {model_chon} ({nam_chon})")
-    
-    # Placeholder: Hiện tại mình để tạm một con số giả lập
-    # Khi bạn có file, mình sẽ viết code tìm kiếm trong file dựa trên hang_chon, model_chon, nam_chon
-    gia_tam_tinh = "Đang chờ kết nối dữ liệu..." 
-    
-    st.info(f"**Giá đề xuất:** {gia_tam_tinh}")
-    st.warning("Lưu ý: Giá trên chỉ mang tính chất tham khảo dựa trên dữ liệu thị trường.")
+    # --- HIỂN THỊ KẾT QUẢ ---
+    if st.button("Xem giá xe", use_container_width=True):
+        # Tìm dòng dữ liệu khớp chính xác
+        ket_qua = df_filtered_by_model[df_filtered_by_model['year'] == nam_chon]
+        
+        st.divider()
+        
+        if not ket_qua.empty:
+            # Vì có thể một model/năm có nhiều dòng, ta lấy dòng đầu tiên
+            xe = ket_qua.iloc[0]
+            
+            st.subheader(f"Kết quả: {hang_chon} {model_chon}")
+            
+            # Hiển thị giá nổi bật
+            st.success(f"### 💰 Giá đề xuất: {xe['price']} VNĐ")
+            
+            # Hiển thị các thông số khác trong 2 cột
+            c1, c2 = st.columns(2)
+            with c1:
+                st.write(f"**📍 Khu vực:** {xe['location']}")
+                st.write(f"**🛣️ Odo:** {xe['odo']} km")
+            with c2:
+                st.write(f"**🛠️ Tình trạng sửa chữa:** {xe['repaired_parts']}")
+                st.write(f"**⭐ Độ mới:** {xe['condition']}/10")
+            
+            st.warning("⚠️ Lưu ý: Giá trên chỉ mang tính chất tham khảo tại thời điểm tra cứu.")
+        else:
+            st.error("Rất tiếc, không tìm thấy dữ liệu cho lựa chọn này.")
 
-st.sidebar.header("Cấu hình dữ liệu")
-uploaded_file = st.sidebar.file_uploader("")
+else:
+    st.info("Vui lòng kiểm tra file CSV và đảm bảo file nằm cùng thư mục với app.py")
+
+# --- SIDEBAR (Tùy chọn thêm) ---
+st.sidebar.header("Thông tin")
+st.sidebar.write("Hệ thống tra cứu giá xe máy cũ/mới dựa trên dữ liệu thị trường.")
