@@ -1,116 +1,92 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import sklearn
 from sklearn.linear_model import LinearRegression
 
-# Cấu hình trang
-st.set_page_config(page_title="Dự Đoán Giá Xe Máy", layout="wide")
+# Cấu hình giao diện
+st.set_page_config(page_title="AI Định Giá Xe Máy", layout="centered")
 
-# --- 1. HÀM TẢI VÀ XỬ LÝ DỮ LIỆU ---
+# --- 1. HÀM TẢI VÀ LÀM SẠCH DỮ LIỆU ---
 @st.cache_data
-def load_and_clean_data():
+def load_data():
     try:
-        # Đọc file CSV bạn đã cung cấp
-        file_path = "xecu.csv"
-        df = pd.read_csv(file_path)
+        # Đọc file CSV (đảm bảo tên file này đúng với file trên GitHub của bạn)
+        path = "datasheet AI's project - Trang tính1.csv"
+        df = pd.read_csv(path)
         
-        # Làm sạch tên cột
+        # Xử lý tên cột bị thừa khoảng trắng
         df.columns = df.columns.str.strip()
         
-        # Xử lý Price: Bỏ ngoặc kép, dấu phẩy và chuyển về số
+        # Chuyển Price từ chuỗi "32,000,000" thành số 32000000
         df['price_numeric'] = df['price'].str.replace('[",]', '', regex=True).astype(float)
         
-        # Xử lý Odo: Bỏ dấu chấm (nếu có) và chuyển về số
+        # Chuyển Odo từ "2.500" thành 2500
         df['odo_numeric'] = df['odo'].astype(str).str.replace('.', '', regex=False).astype(float)
-        
-        # Đảm bảo các cột định dạng chữ chuẩn xác
-        df['brand'] = df['brand'].astype(str).str.strip()
-        df['model'] = df['model'].astype(str).str.strip()
         
         return df
     except Exception as e:
-        st.error(f"Lỗi đọc dữ liệu: {e}")
+        st.error(f"Lỗi tải dữ liệu: {e}")
         return None
 
-# --- 2. HÀM HUẤN LUYỆN ML (LINEAR REGRESSION - GIỐNG TRONG FILE L3.IPYNB) ---
-def train_model_for_bike(df, selected_model):
-    # Lọc dữ liệu theo đúng Model xe người dùng chọn để tăng độ chính xác
-    data_train = df[df['model'] == selected_model].copy()
-    
-    if len(data_train) < 3: # Cần ít nhất vài dòng để học
-        return None, None
-    
-    # X là các cột feature: Năm sản xuất và Odo
-    X = data_train[['year', 'odo_numeric']]
-    # y là giá bán
-    y = data_train['price_numeric']
-    
-    # Khởi tạo và huấn luyện mô hình giống như file L3.ipynb bạn học
-    model = LinearRegression()
-    model.fit(X, y)
-    
-    return model, data_train
+df = load_data()
 
-# --- BẮT ĐẦU CHẠY APP ---
-df = load_and_clean_data()
+# --- 2. GIAO DIỆN CHÍNH ---
+st.title("🏍️ Dự đoán giá xe bằng Linear Regression")
+st.write("Dựa trên kiến thức Hồi quy tuyến tính từ bài học L3.")
 
 if df is not None:
-    st.title("🏍️ AI Predictor - Dự đoán giá xe cũ")
-    st.write("Mô hình được xây dựng dựa trên thuật toán **Linear Regression** (Hồi quy tuyến tính).")
-    st.markdown("---")
+    # Sidebar để chọn dòng xe muốn huấn luyện AI
+    st.sidebar.header("Cấu hình Model AI")
+    all_brands = sorted(df['brand'].unique())
+    selected_brand = st.sidebar.selectbox("Chọn hãng xe:", all_brands)
+    
+    all_models = sorted(df[df['brand'] == selected_brand]['model'].unique())
+    selected_model = st.sidebar.selectbox("Chọn dòng xe để AI học:", all_models)
 
-    # --- PHẦN NHẬP LIỆU ---
-    col1, col2 = st.columns([1, 1])
+    # Lọc dữ liệu theo dòng xe đã chọn để train model
+    data_train = df[df['model'] == selected_model].copy()
 
-    with col1:
-        st.subheader("📋 Thông tin xe")
+    if len(data_train) >= 3:
+        # --- 3. HUẤN LUYỆN MODEL (Giống hệt file L3.ipynb) ---
+        # Feature X: Năm và Odo | Target y: Giá
+        X_train = data_train[['year', 'odo_numeric']]
+        y_train = data_train['price_numeric']
         
-        # Chọn Hãng
-        list_brand = sorted(df['brand'].unique())
-        brand_user = st.selectbox("Chọn hãng xe:", list_brand)
+        model_ai = LinearRegression()
+        model_ai.fit(X=X_train, y=y_train)
         
-        # Chọn Model dựa trên Hãng
-        list_model = sorted(df[df['brand'] == brand_user]['model'].unique())
-        model_user = st.selectbox("Chọn dòng xe (Model):", list_model)
+        # --- 4. NHẬP THÔNG TIN DỰ ĐOÁN ---
+        st.subheader(f"Dự đoán giá cho dòng xe: {selected_model}")
         
-        # Nhập Năm và Odo để dự đoán
-        year_user = st.number_input("Năm sản xuất:", min_value=2010, max_value=2025, value=2020)
-        odo_user = st.number_input("Số KM đã đi (Odo):", min_value=0, value=15000, step=1000)
+        col1, col2 = st.columns(2)
+        with col1:
+            input_year = st.number_input("Năm sản xuất:", min_value=2010, max_value=2026, value=2022)
+        with col2:
+            input_odo = st.number_input("Số KM đã đi (Odo):", min_value=0, value=5000, step=500)
 
-    # --- PHẦN DỰ ĐOÁN ---
-    with col2:
-        st.subheader("💰 AI Định giá")
-        
-        if st.button("Dự đoán giá bán ngay", use_container_width=True):
-            # Huấn luyện mô hình cho dòng xe cụ thể này
-            ml_model, filtered_df = train_model_for_bike(df, model_user)
+        if st.button("Tính toán giá dự kiến"):
+            # Tạo mảng để dự đoán
+            X_new = pd.DataFrame([[input_year, input_odo]], columns=['year', 'odo_numeric'])
+            prediction = model_ai.predict(X_new)[0]
             
-            if ml_model is not None:
-                # Tạo mảng dữ liệu để dự đoán
-                input_data = pd.DataFrame([[year_user, odo_user]], columns=['year', 'odo_numeric'])
-                
-                # Thực hiện dự đoán
-                prediction = ml_model.predict(input_data)[0]
-                
-                # Tránh trường hợp dự đoán ra số âm do ít dữ liệu
-                final_price = max(prediction, 0)
-                
-                st.metric(label="Giá dự đoán", value=f"{final_price:,.0f} VNĐ")
-                
-                # Hiển thị độ chính xác (R-squared) giống như lệnh model.score() trong L3.ipynb
-                score = ml_model.score(filtered_df[['year', 'odo_numeric']], filtered_df['price_numeric'])
-                st.caption(f"Độ tin cậy của mô hình cho dòng xe này: {score:.2%}")
-                
-                st.info(f"💡 AI nhận thấy: Xe đời càng cao và Odo càng thấp thì giá sẽ càng tiệm cận mức giá trần của dòng {model_user}.")
-            else:
-                st.error("Dữ liệu cho dòng xe này quá ít để AI có thể học và dự đoán chính xác. Vui lòng thử dòng xe khác!")
+            # Đảm bảo không dự đoán ra số âm
+            final_price = max(prediction, 0)
+            
+            st.divider()
+            st.success(f"### 💰 Giá AI dự đoán: {final_price:,.0f} VNĐ")
+            
+            # Hiển thị các chỉ số giống trong file L3.ipynb
+            st.write("**Thông số kỹ thuật của mô hình:**")
+            st.text(f"Hệ số chặn (Intercept): {model_ai.intercept_:,.2f}")
+            st.text(f"Hệ số góc (Coefficients): {model_ai.coef_}")
+            st.text(f"Độ chính xác (Score): {model_ai.score(X_train, y_train):.2%}")
+            
+    else:
+        st.warning(f"Dòng xe {selected_model} hiện chỉ có {len(data_train)} mẫu dữ liệu. AI cần ít nhất 3 mẫu để thực hiện thuật toán Linear Regression.")
 
-    # --- BIỂU ĐỒ ---
-    st.markdown("---")
-    if st.checkbox("Xem biểu đồ phân bổ giá theo năm của dòng xe này"):
-        chart_data = df[df['model'] == model_user]
-        st.scatter_chart(data=chart_data, x='year', y='price_numeric')
+    # Hiển thị bảng dữ liệu tham khảo
+    with st.expander("Xem danh sách dữ liệu gốc"):
+        st.dataframe(df[['brand', 'model', 'year', 'odo', 'price']])
 
 else:
-    st.error("Vui lòng tải file 'datasheet AI's project - Trang tính1.csv' lên cùng thư mục code.")
+    st.info("Hãy đảm bảo file CSV nằm đúng thư mục trên GitHub của bạn.")
