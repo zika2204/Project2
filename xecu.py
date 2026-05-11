@@ -2,20 +2,53 @@ import streamlit as st
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
-# =========================
-# CẤU HÌNH TRANG
-# =========================
+# =====================================
+# CẤU HÌNH GIAO DIỆN
+# =====================================
 st.set_page_config(
-    page_title="AI Định Giá Xe Máy",
+    page_title="MOTO CŨ VN",
     page_icon="🏍️",
     layout="centered"
 )
 
-# =========================
+# =====================================
+# CSS
+# =====================================
+st.markdown("""
+    <style>
+    .main {
+        padding-top: 20px;
+    }
+
+    .title {
+        text-align: center;
+        font-size: 45px;
+        font-weight: bold;
+        color: #E53935;
+    }
+
+    .subtitle {
+        text-align: center;
+        font-size: 18px;
+        color: gray;
+        margin-bottom: 30px;
+    }
+
+    .result-box {
+        padding: 20px;
+        border-radius: 15px;
+        background-color: #f3f3f3;
+        margin-top: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# =====================================
 # LOAD DATA
-# =========================
+# =====================================
 @st.cache_data
 def load_data():
+
     try:
         # Đọc file CSV
         df = pd.read_csv("xecu.csv")
@@ -23,9 +56,7 @@ def load_data():
         # Chuẩn hóa tên cột
         df.columns = df.columns.str.strip().str.lower()
 
-        # =========================
-        # XỬ LÝ GIÁ
-        # =========================
+        # Xử lý giá
         df["price_numeric"] = (
             df["price"]
             .astype(str)
@@ -34,9 +65,7 @@ def load_data():
             .astype(float)
         )
 
-        # =========================
-        # XỬ LÝ ODO
-        # =========================
+        # Xử lý ODO
         df["odo_numeric"] = (
             df["odo"]
             .astype(str)
@@ -45,7 +74,7 @@ def load_data():
             .astype(float)
         )
 
-        # Xóa dữ liệu trống
+        # Xóa dữ liệu lỗi
         df = df.dropna()
 
         return df
@@ -57,77 +86,92 @@ def load_data():
 
 df = load_data()
 
-# =========================
-# GIAO DIỆN CHÍNH
-# =========================
-st.title("🏍️ AI Dự Đoán Giá Xe Máy")
-st.write(
-    "Ứng dụng sử dụng Linear Regression để dự đoán giá xe máy cũ."
+# =====================================
+# HEADER
+# =====================================
+st.markdown(
+    '<p class="title">🏍️ MOTO CŨ VN</p>',
+    unsafe_allow_html=True
 )
 
-# =========================
-# NẾU LOAD DATA THÀNH CÔNG
-# =========================
+st.markdown(
+    '<p class="subtitle">AI dự đoán giá xe máy cũ tại Việt Nam</p>',
+    unsafe_allow_html=True
+)
+
+# =====================================
+# MAIN APP
+# =====================================
 if df is not None:
 
-    # =========================
-    # SIDEBAR
-    # =========================
-    st.sidebar.header("⚙️ Chọn xe")
+    st.subheader("📌 Nhập thông tin xe")
 
-    # Danh sách hãng
+    # =====================================
+    # CHỌN HÃNG XE
+    # =====================================
     all_brands = sorted(df["brand"].unique())
 
-    selected_brand = st.sidebar.selectbox(
+    selected_brand = st.selectbox(
         "Hãng xe",
         all_brands
     )
 
-    # Danh sách model theo hãng
+    # =====================================
+    # CHỌN DÒNG XE
+    # =====================================
     all_models = sorted(
         df[df["brand"] == selected_brand]["model"].unique()
     )
 
-    selected_model = st.sidebar.selectbox(
+    selected_model = st.selectbox(
         "Dòng xe",
         all_models
     )
 
-    # =========================
-    # DATA TRAIN
-    # =========================
+    # =====================================
+    # INPUT NĂM & ODO
+    # =====================================
+    col1, col2 = st.columns(2)
 
-    # Data cùng model
+    with col1:
+        input_year = st.number_input(
+            "Năm sản xuất",
+            min_value=2010,
+            max_value=2026,
+            value=2022
+        )
+
+    with col2:
+        input_odo = st.number_input(
+            "Số KM đã chạy",
+            min_value=0,
+            value=5000,
+            step=500
+        )
+
+    # =====================================
+    # DATA TRAIN
+    # =====================================
     data_same_model = df[
         df["model"] == selected_model
     ]
 
-    # Data cùng hãng
     data_same_brand = df[
         df["brand"] == selected_brand
     ]
 
-    # Gộp data
     data_train = pd.concat([
         data_same_model,
         data_same_brand
     ])
 
-    # Xóa trùng
     data_train = data_train.drop_duplicates()
 
-    # =========================
-    # CHECK DATA
-    # =========================
+    # =====================================
+    # TRAIN MODEL
+    # =====================================
     if len(data_train) >= 5:
 
-        st.write(
-            f"📊 AI đang học từ {len(data_train)} mẫu dữ liệu"
-        )
-
-        # =========================
-        # FEATURE & TARGET
-        # =========================
         X_train = data_train[
             ["year", "odo_numeric"]
         ]
@@ -136,44 +180,16 @@ if df is not None:
             "price_numeric"
         ]
 
-        # =========================
-        # TRAIN MODEL
-        # =========================
         model_ai = LinearRegression()
 
         model_ai.fit(X_train, y_train)
 
-        # =========================
-        # NHẬP THÔNG TIN XE
-        # =========================
-        st.subheader(
-            f"🔍 Dự đoán giá xe {selected_model}"
-        )
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            input_year = st.number_input(
-                "Năm sản xuất",
-                min_value=2010,
-                max_value=2026,
-                value=2022
-            )
-
-        with col2:
-            input_odo = st.number_input(
-                "Số KM đã chạy",
-                min_value=0,
-                value=5000,
-                step=500
-            )
-
-        # =========================
-        # BUTTON DỰ ĐOÁN
-        # =========================
+        # =====================================
+        # BUTTON
+        # =====================================
         if st.button("💰 Dự đoán giá"):
 
-            # Tạo dữ liệu mới
+            # Dữ liệu mới
             X_new = pd.DataFrame(
                 [[input_year, input_odo]],
                 columns=[
@@ -185,80 +201,83 @@ if df is not None:
             # Predict
             prediction = model_ai.predict(X_new)[0]
 
-            # Không cho âm
             final_price = max(prediction, 0)
 
-            st.divider()
+            # =====================================
+            # TÍNH GIẢM GIÁ
+            # =====================================
+            newest_year = data_train["year"].max()
 
-            # =========================
-            # KẾT QUẢ
-            # =========================
-            st.success(
-                f"### 💵 Giá dự đoán: {final_price:,.0f} VNĐ"
+            years_used = newest_year - input_year
+
+            depreciation_year = years_used * 0.05 * final_price
+
+            depreciation_odo = (
+                input_odo / 1000
+            ) * 120000
+
+            total_depreciation = (
+                depreciation_year
+                + depreciation_odo
             )
 
-            # =========================
-            # THÔNG SỐ AI
-            # =========================
-            st.subheader("📈 Thông số mô hình")
+            # =====================================
+            # HIỂN THỊ KẾT QUẢ
+            # =====================================
+            st.markdown(
+                f"""
+                <div class="result-box">
 
-            year_coef = model_ai.coef_[0]
-            odo_coef = model_ai.coef_[1]
+                <h2>💵 Giá dự đoán</h2>
 
-            st.write(
-                f"**Intercept:** {model_ai.intercept_:,.2f}"
-            )
+                <h1 style="color:#E53935;">
+                {final_price:,.0f} VNĐ
+                </h1>
 
-            st.write(
-                f"**Hệ số năm sản xuất:** {year_coef:,.2f}"
-            )
+                <hr>
 
-            st.write(
-                f"**Hệ số ODO:** {odo_coef:,.2f}"
-            )
+                <h3>📉 Mức giảm giá</h3>
 
-            # Logic ODO
-            if odo_coef > 0:
-                st.warning(
-                    "⚠️ AI đang học chưa chính xác "
-                    "(ODO tăng nhưng giá cũng tăng). "
-                    "Cần thêm dữ liệu thực tế."
-                )
-            else:
-                st.success(
-                    "✅ AI đã học đúng logic thị trường."
-                )
+                <p>
+                • Theo số năm sử dụng:
+                <b>{depreciation_year:,.0f} VNĐ</b>
+                </p>
 
-            # Score
-            score = model_ai.score(
-                X_train,
-                y_train
-            )
+                <p>
+                • Theo số KM đã chạy:
+                <b>{depreciation_odo:,.0f} VNĐ</b>
+                </p>
 
-            st.write(
-                f"**Độ chính xác (R² Score):** {score:.2%}"
-            )
+                <p>
+                • Tổng mức khấu hao:
+                <b>{total_depreciation:,.0f} VNĐ</b>
+                </p>
 
-        # =========================
-        # XEM DATA GỐC
-        # =========================
-        with st.expander("📋 Xem dữ liệu gốc"):
-
-            st.dataframe(
-                data_train[
-                    [
-                        "brand",
-                        "model",
-                        "year",
-                        "odo",
-                        "price"
-                    ]
-                ]
+                </div>
+                """,
+                unsafe_allow_html=True
             )
 
     else:
         st.warning(
-            "❌ Không đủ dữ liệu để train AI."
+            "Không đủ dữ liệu để AI học."
+        )
+
+    # =====================================
+    # XEM DATA
+    # =====================================
+    with st.expander("📋 Xem dữ liệu tham khảo"):
+
+        st.dataframe(
+            df[
+                [
+                    "brand",
+                    "model",
+                    "year",
+                    "odo",
+                    "price"
+                ]
+            ]
         )
 
 else:
