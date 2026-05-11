@@ -61,7 +61,7 @@ def load_data():
         df.columns = df.columns.str.strip().str.lower()
 
         # =====================================
-        # XỬ LÝ PRICE
+        # XỬ LÝ GIÁ
         # =====================================
         df["price_numeric"] = (
             df["price"]
@@ -81,18 +81,6 @@ def load_data():
             .str.replace(",", "", regex=False)
             .astype(float)
         )
-
-        # =====================================
-        # THÊM CONDITION
-        # =====================================
-        if "condition" not in df.columns:
-            df["condition"] = 8
-
-        # =====================================
-        # THÊM PARTS_CHANGED
-        # =====================================
-        if "parts_changed" not in df.columns:
-            df["parts_changed"] = 0
 
         # Xóa dữ liệu lỗi
         df = df.dropna()
@@ -152,7 +140,7 @@ if df is not None:
     )
 
     # =====================================
-    # INPUT NĂM & ODO
+    # NHẬP NĂM & ODO
     # =====================================
     col1, col2 = st.columns(2)
 
@@ -171,27 +159,6 @@ if df is not None:
             value=5000,
             step=500
         )
-
-    # =====================================
-    # TÌNH TRẠNG XE
-    # =====================================
-    input_condition = st.slider(
-        "Tình trạng xe (0 - 10)",
-        min_value=0,
-        max_value=10,
-        value=8
-    )
-
-    # =====================================
-    # THAY PHỤ TÙNG
-    # =====================================
-    parts_changed = st.radio(
-        "Xe đã thay phụ tùng chưa?",
-        ["Chưa", "Đã thay"]
-    )
-
-    # Đổi thành số
-    parts_value = 1 if parts_changed == "Đã thay" else 0
 
     # =====================================
     # DATA TRAIN
@@ -220,9 +187,7 @@ if df is not None:
         X_train = data_train[
             [
                 "year",
-                "odo_numeric",
-                "condition",
-                "parts_changed"
+                "odo_numeric"
             ]
         ]
 
@@ -246,15 +211,11 @@ if df is not None:
             X_new = pd.DataFrame(
                 [[
                     input_year,
-                    input_odo,
-                    input_condition,
-                    parts_value
+                    input_odo
                 ]],
                 columns=[
                     "year",
-                    "odo_numeric",
-                    "condition",
-                    "parts_changed"
+                    "odo_numeric"
                 ]
             )
 
@@ -278,9 +239,8 @@ if df is not None:
                 </h1>
 
                 <p style="color:gray;">
-                Giá được AI dự đoán dựa trên:
-                năm sản xuất, số KM đã chạy,
-                tình trạng xe và phụ tùng.
+                Giá được AI dự đoán dựa trên
+                năm sản xuất và số KM đã chạy.
                 </p>
 
                 </div>
@@ -294,7 +254,7 @@ if df is not None:
         )
 
     # =====================================
-    # XEM DỮ LIỆU GỐC
+    # XEM DỮ LIỆU
     # =====================================
     with st.expander("📋 Xem dữ liệu tham khảo"):
 
