@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import scikit-learn as sklearn
 from sklearn.linear_model import LinearRegression
 
 # Cấu hình trang
@@ -11,7 +12,7 @@ st.set_page_config(page_title="AI Dự Đoán Giá Xe Máy", layout="wide")
 def load_and_clean_data():
     try:
         # Đọc file CSV bạn đã cung cấp
-        file_path = "datasheet AI's project - Trang tính1.csv"
+        file_path = "xecu.csv"
         df = pd.read_csv(file_path)
         
         # Làm sạch tên cột
