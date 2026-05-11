@@ -12,7 +12,7 @@ st.set_page_config(page_title="AI Dự Đoán Giá Xe Máy", layout="wide")
 def load_data():
     try:
         # Đọc file (đảm bảo tên file khớp với file bạn đã up lên GitHub)
-        file_path = "datasheet AI's project - Trang tính1.csv"
+        file_path = "xecu.csv"
         df = pd.read_csv(file_path)
         
         # Làm sạch tên cột
