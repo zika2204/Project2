@@ -317,7 +317,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-            )
 
     else:
         st.warning(
