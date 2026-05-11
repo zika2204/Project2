@@ -1,86 +1,134 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import LabelEncoder
 
 # Cấu hình trang
-st.set_page_config(page_title="Hệ thống tra cứu giá xe máy", layout="centered")
+st.set_page_config(page_title="AI Dự Đoán Giá Xe Máy", layout="wide")
 
-# --- HÀM TẢI DỮ LIỆU ---
+# --- 1. HÀM TẢI VÀ XỬ LÝ DỮ LIỆU ---
 @st.cache_data
 def load_data():
     try:
-        # Thay đổi tên file này cho đúng với file của bạn trên GitHub
+        # Đọc file (đảm bảo tên file khớp với file bạn đã up lên GitHub)
         file_path = "datasheet AI's project - Trang tính1.csv"
         df = pd.read_csv(file_path)
         
-        # Làm sạch tên cột (xóa khoảng trắng thừa)
+        # Làm sạch tên cột
         df.columns = df.columns.str.strip()
         
-        # Chuyển đổi năm về kiểu số nguyên
-        df['year'] = df['year'].astype(int)
+        # Xử lý cột Price: Bỏ dấu phẩy, bỏ ngoặc kép -> Chuyển thành số
+        df['price_numeric'] = df['price'].str.replace('[",]', '', regex=True).astype(float)
         
-        # Chuyển đổi odo về kiểu chuỗi để hiển thị đẹp hơn
-        df['odo'] = df['odo'].astype(str)
+        # Xử lý cột Odo: Bỏ dấu chấm (nếu có dạng 2.500) -> Chuyển thành số
+        df['odo_numeric'] = df['odo'].astype(str).str.replace('.', '', regex=False).astype(float)
+        
+        # Chuyển các cột định dạng chữ về string để không lỗi
+        df['brand'] = df['brand'].astype(str).str.strip()
+        df['model'] = df['model'].astype(str).str.strip()
         
         return df
     except Exception as e:
-        st.error(f"Không tìm thấy hoặc không thể đọc file dữ liệu: {e}")
+        st.error(f"Lỗi tải dữ liệu: {e}")
         return None
 
-# Load dữ liệu
+# --- 2. HÀM HUẤN LUYỆN AI (MACHINE LEARNING) ---
+@st.cache_resource
+def train_ai_model(df):
+    # Chọn các đặc tính để AI học
+    features = ['brand', 'model', 'year', 'odo_numeric', 'condition']
+    X = df[features].copy()
+    y = df['price_numeric']
+
+    # Mã hóa chữ thành số để máy học được
+    le_brand = LabelEncoder()
+    le_model = LabelEncoder()
+    
+    X['brand'] = le_brand.fit_transform(X['brand'])
+    X['model'] = le_model.fit_transform(X['model'])
+
+    # Huấn luyện mô hình Random Forest
+    model = RandomForestRegressor(n_estimators=200, random_state=42)
+    model.fit(X, y)
+    
+    return model, le_brand, le_model
+
+# Chạy tải dữ liệu
 df = load_data()
 
-# --- GIAO DIỆN APP ---
-st.title("🏍️ Hệ thống tra cứu giá xe")
-st.write("Dữ liệu được cập nhật tự động từ file datasheet.")
-
 if df is not None:
-    # --- PHẦN CHỌN DỮ LIỆU ---
-    # 1. Chọn Hãng (Lấy từ cột 'brand')
-    list_hang = sorted(df['brand'].unique())
-    hang_chon = st.selectbox("Chọn hãng xe:", list_hang)
+    # Huấn luyện AI
+    model, le_brand, le_model = train_ai_model(df)
 
-    # 2. Chọn Model (Chỉ hiện các model thuộc hãng đã chọn)
-    df_filtered_by_brand = df[df['brand'] == hang_chon]
-    list_model = sorted(df_filtered_by_brand['model'].unique())
-    model_chon = st.selectbox("Chọn model xe:", list_model)
+    # --- GIAO DIỆN ---
+    st.title("🤖 Trí Tuệ Nhân Tạo Dự Đoán Giá Xe Máy Cũ")
+    st.markdown("---")
 
-    # 3. Chọn Năm (Chỉ hiện các năm có sẵn của model đó)
-    df_filtered_by_model = df_filtered_by_brand[df_filtered_by_brand['model'] == model_chon]
-    list_year = sorted(df_filtered_by_model['year'].unique(), reverse=True)
-    nam_chon = st.selectbox("Chọn năm sản xuất:", list_year)
+    col1, col2 = st.columns([1, 1])
 
-    # --- HIỂN THỊ KẾT QUẢ ---
-    if st.button("Xem giá xe", use_container_width=True):
-        # Tìm dòng dữ liệu khớp chính xác
-        ket_qua = df_filtered_by_model[df_filtered_by_model['year'] == nam_chon]
+    with col1:
+        st.subheader("📋 Nhập thông tin xe cần định giá")
         
-        st.divider()
+        # Chọn Hãng
+        brand_list = sorted(df['brand'].unique())
+        input_brand = st.selectbox("Chọn hãng xe:", brand_list)
         
-        if not ket_qua.empty:
-            # Vì có thể một model/năm có nhiều dòng, ta lấy dòng đầu tiên
-            xe = ket_qua.iloc[0]
-            
-            st.subheader(f"Kết quả: {hang_chon} {model_chon}")
-            
-            # Hiển thị giá nổi bật
-            st.success(f"### 💰 Giá đề xuất: {xe['price']} VNĐ")
-            
-            # Hiển thị các thông số khác trong 2 cột
-            c1, c2 = st.columns(2)
-            with c1:
-                st.write(f"**📍 Khu vực:** {xe['location']}")
-                st.write(f"**🛣️ Odo:** {xe['odo']} km")
-            with c2:
-                st.write(f"**🛠️ Tình trạng sửa chữa:** {xe['repaired_parts']}")
-                st.write(f"**⭐ Độ mới:** {xe['condition']}/10")
-            
-            st.warning("⚠️ Lưu ý: Giá trên chỉ mang tính chất tham khảo tại thời điểm tra cứu.")
+        # Chọn Model (lọc theo hãng)
+        model_list = sorted(df[df['brand'] == input_brand]['model'].unique())
+        input_model = st.selectbox("Chọn dòng xe (Model):", model_list)
+        
+        # Nhập năm
+        input_year = st.number_input("Năm sản xuất:", min_value=2000, max_value=2025, value=2020)
+        
+        # Nhập Odo
+        input_odo = st.number_input("Số KM đã đi (Odo):", min_value=0, value=10000, step=500)
+        
+        # Chọn độ mới
+        input_condition = st.slider("Độ mới của xe (1: Rất cũ - 10: Như mới):", 1, 10, 7)
+
+    with col2:
+        st.subheader("💰 Kết quả định giá từ AI")
+        
+        if st.button("BẮT ĐẦU DỰ ĐOÁN", use_container_width=True):
+            # Kiểm tra xem Model này AI đã từng thấy chưa
+            try:
+                # Chuẩn bị dữ liệu để AI dự đoán
+                brand_encoded = le_brand.transform([input_brand])[0]
+                
+                # Nếu người dùng nhập model mới hoàn toàn, xử lý lỗi
+                try:
+                    model_encoded = le_model.transform([input_model])[0]
+                except:
+                    model_encoded = 0
+                
+                input_data = np.array([[brand_encoded, model_encoded, input_year, input_odo, input_condition]])
+                
+                # AI đưa ra con số
+                prediction = model.predict(input_data)[0]
+                
+                # Hiển thị kết quả
+                st.metric(label="Giá dự đoán trung bình", value=f"{prediction:,.0f} VNĐ")
+                
+                st.success(f"Dựa trên dữ liệu, chiếc **{input_brand} {input_model}** của bạn có giá khoảng **{prediction/1000000:.1f} triệu đồng**.")
+                
+                # So sánh với thực tế trong file
+                actual_data = df[(df['brand'] == input_brand) & (df['model'] == input_model)]
+                if not actual_data.empty:
+                    st.write("**📊 Tham khảo giá thực tế trong lịch sử:**")
+                    st.dataframe(actual_data[['year', 'odo', 'condition', 'price']].head(5))
+                
+            except Exception as e:
+                st.error(f"Đã xảy ra lỗi khi tính toán: {e}")
+
+    # --- PHẦN PHÂN TÍCH THÊM ---
+    st.markdown("---")
+    with st.expander("🔍 Xem xu hướng giá theo năm của dòng xe này"):
+        chart_data = df[df['model'] == input_model].sort_values('year')
+        if not chart_data.empty:
+            st.line_chart(data=chart_data, x='year', y='price_numeric')
         else:
-            st.error("Rất tiếc, không tìm thấy dữ liệu cho lựa chọn này.")
+            st.write("Không đủ dữ liệu để vẽ biểu đồ.")
 
 else:
-    st.info("Vui lòng kiểm tra file CSV và đảm bảo file nằm cùng thư mục với app.py")
-
-# --- SIDEBAR (Tùy chọn thêm) ---
-st.sidebar.header("Thông tin")
-st.sidebar.write("Hệ thống tra cứu giá xe máy cũ/mới dựa trên dữ liệu thị trường.")
+    st.warning("Vui lòng kiểm tra file CSV dữ liệu đầu vào.")
