@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from sklearn.linear_model import LinearRegression
 
 # =========================
-# CONFIG GIAO DIỆN
+# CẤU HÌNH TRANG
 # =========================
 st.set_page_config(
     page_title="AI Định Giá Xe Máy",
@@ -19,14 +18,13 @@ st.set_page_config(
 def load_data():
     try:
         # Đọc file CSV
-        path = "xecu.csv"
-        df = pd.read_csv(path)
+        df = pd.read_csv("xecu.csv")
 
-        # Làm sạch tên cột
+        # Chuẩn hóa tên cột
         df.columns = df.columns.str.strip().str.lower()
 
         # =========================
-        # XỬ LÝ PRICE
+        # XỬ LÝ GIÁ
         # =========================
         df["price_numeric"] = (
             df["price"]
@@ -47,7 +45,7 @@ def load_data():
             .astype(float)
         )
 
-        # Xóa dữ liệu lỗi
+        # Xóa dữ liệu trống
         df = df.dropna()
 
         return df
@@ -63,48 +61,94 @@ df = load_data()
 # GIAO DIỆN CHÍNH
 # =========================
 st.title("🏍️ AI Dự Đoán Giá Xe Máy")
-st.write("Ứng dụng sử dụng thuật toán Linear Regression để dự đoán giá xe.")
+st.write(
+    "Ứng dụng sử dụng Linear Regression để dự đoán giá xe máy cũ."
+)
 
+# =========================
+# NẾU LOAD DATA THÀNH CÔNG
+# =========================
 if df is not None:
 
     # =========================
     # SIDEBAR
     # =========================
-    st.sidebar.header("⚙️ Cấu hình AI")
+    st.sidebar.header("⚙️ Chọn xe")
 
-    # Chọn hãng xe
+    # Danh sách hãng
     all_brands = sorted(df["brand"].unique())
+
     selected_brand = st.sidebar.selectbox(
-        "Chọn hãng xe:",
+        "Hãng xe",
         all_brands
     )
 
-    # =========================
-    # TRAIN MODEL
-    # =========================
-    # Train theo hãng để có nhiều data hơn
-    data_train = df[df["brand"] == selected_brand].copy()
+    # Danh sách model theo hãng
+    all_models = sorted(
+        df[df["brand"] == selected_brand]["model"].unique()
+    )
 
-    st.write(f"📊 Số lượng dữ liệu huấn luyện: {len(data_train)} mẫu")
+    selected_model = st.sidebar.selectbox(
+        "Dòng xe",
+        all_models
+    )
 
+    # =========================
+    # DATA TRAIN
+    # =========================
+
+    # Data cùng model
+    data_same_model = df[
+        df["model"] == selected_model
+    ]
+
+    # Data cùng hãng
+    data_same_brand = df[
+        df["brand"] == selected_brand
+    ]
+
+    # Gộp data
+    data_train = pd.concat([
+        data_same_model,
+        data_same_brand
+    ])
+
+    # Xóa trùng
+    data_train = data_train.drop_duplicates()
+
+    # =========================
+    # CHECK DATA
+    # =========================
     if len(data_train) >= 5:
 
-        # Features
-        X_train = data_train[["year", "odo_numeric"]]
+        st.write(
+            f"📊 AI đang học từ {len(data_train)} mẫu dữ liệu"
+        )
 
-        # Target
-        y_train = data_train["price_numeric"]
+        # =========================
+        # FEATURE & TARGET
+        # =========================
+        X_train = data_train[
+            ["year", "odo_numeric"]
+        ]
 
-        # Tạo model
+        y_train = data_train[
+            "price_numeric"
+        ]
+
+        # =========================
+        # TRAIN MODEL
+        # =========================
         model_ai = LinearRegression()
 
-        # Huấn luyện
         model_ai.fit(X_train, y_train)
 
         # =========================
-        # NHẬP DỮ LIỆU
+        # NHẬP THÔNG TIN XE
         # =========================
-        st.subheader("🔍 Nhập thông tin xe")
+        st.subheader(
+            f"🔍 Dự đoán giá xe {selected_model}"
+        )
 
         col1, col2 = st.columns(2)
 
@@ -118,42 +162,52 @@ if df is not None:
 
         with col2:
             input_odo = st.number_input(
-                "Số KM đã đi",
+                "Số KM đã chạy",
                 min_value=0,
                 value=5000,
                 step=500
             )
 
         # =========================
-        # DỰ ĐOÁN
+        # BUTTON DỰ ĐOÁN
         # =========================
         if st.button("💰 Dự đoán giá"):
 
+            # Tạo dữ liệu mới
             X_new = pd.DataFrame(
                 [[input_year, input_odo]],
-                columns=["year", "odo_numeric"]
+                columns=[
+                    "year",
+                    "odo_numeric"
+                ]
             )
 
+            # Predict
             prediction = model_ai.predict(X_new)[0]
 
-            # Không cho giá âm
+            # Không cho âm
             final_price = max(prediction, 0)
 
             st.divider()
 
+            # =========================
+            # KẾT QUẢ
+            # =========================
             st.success(
                 f"### 💵 Giá dự đoán: {final_price:,.0f} VNĐ"
             )
 
             # =========================
-            # THÔNG SỐ MODEL
+            # THÔNG SỐ AI
             # =========================
-            st.subheader("📈 Thông số AI")
+            st.subheader("📈 Thông số mô hình")
 
             year_coef = model_ai.coef_[0]
             odo_coef = model_ai.coef_[1]
 
-            st.write(f"**Intercept:** {model_ai.intercept_:,.2f}")
+            st.write(
+                f"**Intercept:** {model_ai.intercept_:,.2f}"
+            )
 
             st.write(
                 f"**Hệ số năm sản xuất:** {year_coef:,.2f}"
@@ -163,39 +217,51 @@ if df is not None:
                 f"**Hệ số ODO:** {odo_coef:,.2f}"
             )
 
-            # Kiểm tra logic ODO
+            # Logic ODO
             if odo_coef > 0:
                 st.warning(
-                    "⚠️ AI đang học rằng số KM tăng thì giá tăng. "
-                    "Điều này cho thấy dữ liệu huấn luyện chưa đủ tốt."
+                    "⚠️ AI đang học chưa chính xác "
+                    "(ODO tăng nhưng giá cũng tăng). "
+                    "Cần thêm dữ liệu thực tế."
                 )
             else:
                 st.success(
-                    "✅ AI đã học đúng logic: xe chạy nhiều sẽ mất giá."
+                    "✅ AI đã học đúng logic thị trường."
                 )
 
             # Score
-            score = model_ai.score(X_train, y_train)
+            score = model_ai.score(
+                X_train,
+                y_train
+            )
 
-            st.write(f"**Độ chính xác (R² Score):** {score:.2%}")
+            st.write(
+                f"**Độ chính xác (R² Score):** {score:.2%}"
+            )
 
         # =========================
-        # HIỂN THỊ DỮ LIỆU
+        # XEM DATA GỐC
         # =========================
         with st.expander("📋 Xem dữ liệu gốc"):
+
             st.dataframe(
                 data_train[
-                    ["brand", "model", "year", "odo", "price"]
+                    [
+                        "brand",
+                        "model",
+                        "year",
+                        "odo",
+                        "price"
+                    ]
                 ]
             )
 
     else:
         st.warning(
-            "❌ Không đủ dữ liệu để huấn luyện AI. "
-            "Cần ít nhất 5 mẫu dữ liệu."
+            "❌ Không đủ dữ liệu để train AI."
         )
 
 else:
     st.info(
-        "Hãy đảm bảo file dataset.csv nằm đúng thư mục project."
+        "Hãy kiểm tra file xecu.csv."
     )
