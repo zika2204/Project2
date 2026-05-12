@@ -121,7 +121,7 @@ df_ml, brands, models, locations = load_and_clean_data()
 # Nếu bạn có file logo.png, hãy thay link bên dưới thành: src="data:image/png;base64,..." hoặc link online
 st.markdown("""
     <div class="header-container">
-        <img src="logoP2.png" class="logo-img">
+        <img src="logoP2.png", class="logo-img">
         <p class="title">MOTO CŨ VN</p>
         <p class="subtitle">Trí tuệ nhân tạo định giá xe máy cũ Việt Nam</p>
     </div>
