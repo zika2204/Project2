@@ -14,7 +14,7 @@ st.markdown("""
     /* 1. Màu nền và Font */
     .stApp { background-color: #f8fbff; }
 
-    /* 2. Tiêu đề MOTO CŨ VN cực đại (Đã xóa logo) */
+    /* 2. Tiêu đề MOTO CŨ VN cực đại */
     .title { 
         text-align: center;
         font-size: 100px !important; 
@@ -35,23 +35,14 @@ st.markdown("""
     }
 
     /* 3. Đổi màu thanh kéo Slider sang Xanh Dương */
-    .stSlider [data-baseweb="slider"] [aria-valuemax] {
-        background-color: #1E88E5;
-    }
-    .stSlider [data-baseweb="thumb"] {
-        background-color: #1565C0;
-        border: 2px solid #ffffff;
-    }
+    div[data-baseweb="slider"] > div { background-color: transparent; }
+    .stSlider [data-baseweb="slider"] [aria-valuemax] { background-color: #1E88E5; }
+    .stSlider [data-baseweb="thumb"] { background-color: #1565C0; border: 2px solid #ffffff; }
 
     /* 4. Đổi màu Radio Button sang Xanh Dương */
     div[data-testid="stRadio"] label div[data-testid="stMarkdownContainer"] p {
         color: #0D47A1;
         font-weight: bold;
-    }
-    /* Màu khi được chọn */
-    div[data-testid="stRadio"] div[role="radiogroup"] > div[data-bv-tabindex="0"] {
-        background-color: #E3F2FD;
-        border-radius: 10px;
     }
 
     /* 5. Khung hiển thị giá dự đoán */
@@ -93,6 +84,7 @@ st.markdown("""
 def load_and_clean_data():
     try:
         df = pd.read_csv("xecu.csv")
+        # Xử lý tiêu đề cột để tránh lỗi khoảng trắng
         df.columns = df.columns.str.strip().str.lower()
         
         def clean_numeric(value):
@@ -103,12 +95,20 @@ def load_and_clean_data():
         df["price_numeric"] = df["price"].apply(clean_numeric)
         df["odo_numeric"] = df["odo"].apply(clean_numeric)
         df = df[df["price_numeric"] > 500000] 
-        df["is_repaired"] = df["repaired_parts"].astype(str).str.lower().str.contains("yes|có").astype(int)
-        df["condition"] = pd.to_numeric(df["condition"], errors="coerce").fillna(7)
         
+        # Xử lý cột phụ tùng
+        df["is_repaired"] = df["repaired_parts"].astype(str).str.lower().str.contains("yes|có").astype(int)
+        
+        # Xử lý cột tình trạng (đảm bảo không bị lỗi tên cột có dấu cách)
+        cond_col = [c for c in df.columns if 'condition' in c][0]
+        df["condition_score"] = pd.to_numeric(df[cond_col], errors="coerce").fillna(7)
+        
+        # Danh sách cho menu
         brands = sorted(df["brand"].unique())
         models = sorted(df["model"].unique())
         locs = sorted(df["location"].unique())
+        
+        # One-Hot Encoding
         df_ml = pd.get_dummies(df, columns=["brand", "model", "location"])
         return df_ml, brands, models, locs
     except Exception as e:
@@ -118,7 +118,7 @@ def load_and_clean_data():
 df_ml, brands, models, locations = load_and_clean_data()
 
 # =========================================
-# PHẦN TIÊU ĐỀ (KHÔNG LOGO)
+# PHẦN TIÊU ĐỀ
 # =========================================
 st.markdown('<p class="title">MOTO CŨ VN</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Định giá xe máy cũ bằng Trí tuệ nhân tạo</p>', unsafe_allow_html=True)
@@ -132,30 +132,51 @@ if df_ml is not None:
         with c1:
             u_brand = st.selectbox("🎯 Hãng xe", brands)
             u_year = st.number_input("📅 Năm sản xuất", 2010, 2026, 2023)
-            u_cond = st.slider("✨ Độ mới (1-10)", 1, 10, 8) # Màu xanh đã được CSS chỉnh
+            u_cond = st.slider("✨ Độ mới (1-10)", 1, 10, 8)
         with c2:
             u_model = st.selectbox("🏍️ Dòng xe", models)
             u_odo = st.number_input("🛣️ Số KM đã đi", 0, 300000, 5000, step=500)
-            u_rep = st.radio("🛠️ Phụ tùng", ["Còn Zin (Chưa sửa)", "Đã thay/Sửa chữa"]) # Màu xanh đã được CSS chỉnh
+            u_rep = st.radio("🛠️ Tình trạng phụ tùng", ["Còn Zin (Chưa thay)", "Đã thay/Sửa chữa"])
             u_loc = st.selectbox("📍 Khu vực", locations)
 
     # =========================================
     # ML LOGIC
     # =========================================
+    # Lấy các cột dummy
     feature_cols = [c for c in df_ml.columns if any(x in c for x in ["brand_", "model_", "location_"])]
-    feature_cols += ["year", "odo_numeric", "condition", "is_repaired"]
+    feature_cols += ["year", "odo_numeric", "condition_score", "is_repaired"]
     
     X = df_ml[feature_cols]
     y = df_ml["price_numeric"]
 
+    # Huấn luyện mô hình
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     model_ai = LinearRegression().fit(X_train, y_train)
 
     st.write("") 
     if st.button("🚀 XÁC ĐỊNH GIÁ TRỊ NGAY"):
+        # Chuẩn bị input để dự đoán
         in_dict = {col: 0 for col in feature_cols}
-        in_dict["year"], in_dict["odo_numeric"] = u_year, u_odo
-        in_dict["condition"] = u_cond
+        in_dict["year"] = u_year
+        in_dict["odo_numeric"] = u_odo
+        in_dict["condition_score"] = u_cond
         in_dict["is_repaired"] = 1 if u_rep == "Đã thay/Sửa chữa" else 0
         
-        if f"brand_{u_
+        # Bật các cột tương ứng (SỬA LỖI SYNTAX Ở ĐÂY)
+        brand_key = f"brand_{u_brand}"
+        model_key = f"model_{u_model}"
+        loc_key = f"location_{u_loc}"
+        
+        if brand_key in in_dict: in_dict[brand_key] = 1
+        if model_key in in_dict: in_dict[model_key] = 1
+        if loc_key in in_dict: in_dict[loc_key] = 1
+        
+        prediction = model_ai.predict(pd.DataFrame([in_dict]))[0]
+
+        st.markdown(f"""
+        <div class="result-box">
+            <p style="font-size: 22px; color: #1565C0; font-weight: bold; margin-bottom: 10px;">GIÁ DỰ ĐOÁN</p>
+            <div class="price-text">{max(prediction, 0):,.0f} VNĐ</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.balloons()
